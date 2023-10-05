@@ -1,0 +1,85 @@
+<html>
+<body onload="fetchData()">
+<head>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+
+
+<div id="map">
+
+</div>
+
+
+
+
+
+
+<script>
+async function fetchData() {
+    
+    const url1 = "https://geo.stat.fi/geoserver/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=tilastointialueet:kunta4500k&outputFormat=json&srsName=EPSG:4326";
+    const url2 = "https://statfin.stat.fi/PxWeb/sq/4bb2c735-1dc3-4c5e-bde7-2165df85e65f";
+    const url3 = "https://statfin.stat.fi/PxWeb/sq/944493ca-ea4d-4fd9-a75c-4975192f7b6e";
+
+    const muniData = await fetch(url1);
+    const muniJSON = await muniData.json();
+
+    const posMigr = await fetch(url2);
+    const posMigrJSON = await posMigr.json();
+
+    const negMigr = await fetch(url3);
+    const negMigrJSON = await negMigr.json();
+    
+    createMap(muniJSON, posMigrJSON, negMigrJSON)
+
+}
+    
+function createMap(muniJSON, posMigrJSON, negMigrJSON) {
+    let map = L.map("map")
+
+    let geoJSON = L.geoJSON(muniJSON, {
+        onEachFeature: addData,
+        weight: 2
+    }).addTo(map)
+
+    let layer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        minZoom: -3,
+        attribution: "© OpenStreetMap"
+    }).addTo(map);
+    map.fitBounds(geoJSON.getBounds())
+
+    function addData(feature, layer) {
+    if (!feature.properties.nimi) return;
+    const id = feature.properties.nimi;
+    layer.bindTooltip(id)
+
+    let muniTag = "KU" + feature.properties.kunta;
+    let muniIndex = posMigrJSON.dataset.dimension.Tuloalue.category.index[muniTag];
+    let muniArrivals = posMigrJSON.dataset.value[muniIndex];
+    let muniDepartures = negMigrJSON.dataset.value[muniIndex];
+
+    layer.bindPopup(
+        id + "<br>" + "<br>" +
+        "Positive migration: " + muniArrivals + "<br>" +
+        "Negative migration: " + muniDepartures
+    )
+
+    let hue = (muniArrivals / muniDepartures) ** 3 * 60
+    if (hue > 120) {
+        hue = 120;
+    }
+    let color = "hsl("+hue+","+"75%"+","+"50%"+")"
+    console.log(color)
+    layer.setStyle({color: color})
+    }
+
+
+}
+
+
+</script>
+
+</body>
+</html>
